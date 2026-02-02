@@ -1,0 +1,11 @@
+{
+  "name": "olympics-medals-widget",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update": "node scripts/updateMedals.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12"
+  }
+}
