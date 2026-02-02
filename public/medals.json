@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-02T17:08:22.904Z",
+  "updatedAt": "2026-02-02T17:41:05.205Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -14,7 +14,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/it.svg",
+      "flag": "https://flagcdn.com/w40/it.png",
       "placeholder": true
     },
     {
@@ -25,7 +25,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/us.svg",
+      "flag": "https://flagcdn.com/w40/us.png",
       "placeholder": true
     },
     {
@@ -36,7 +36,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/ca.svg",
+      "flag": "https://flagcdn.com/w40/ca.png",
       "placeholder": true
     },
     {
@@ -47,7 +47,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/de.svg",
+      "flag": "https://flagcdn.com/w40/de.png",
       "placeholder": true
     },
     {
@@ -58,7 +58,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/no.svg",
+      "flag": "https://flagcdn.com/w40/no.png",
       "placeholder": true
     },
     {
@@ -69,7 +69,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/se.svg",
+      "flag": "https://flagcdn.com/w40/se.png",
       "placeholder": true
     },
     {
@@ -80,7 +80,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/fr.svg",
+      "flag": "https://flagcdn.com/w40/fr.png",
       "placeholder": true
     },
     {
@@ -91,7 +91,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/ch.svg",
+      "flag": "https://flagcdn.com/w40/ch.png",
       "placeholder": true
     },
     {
@@ -102,7 +102,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/at.svg",
+      "flag": "https://flagcdn.com/w40/at.png",
       "placeholder": true
     },
     {
@@ -113,7 +113,7 @@
       "silver": 0,
       "bronze": 0,
       "total": 0,
-      "flag": "https://flagcdn.com/nl.svg",
+      "flag": "https://flagcdn.com/w40/nl.png",
       "placeholder": true
     }
   ]
