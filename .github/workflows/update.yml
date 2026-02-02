@@ -17,13 +17,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
 
+      # Use npm install (does not require package-lock.json)
       - run: npm install
 
       - name: Update medals
         run: npm run update
         env:
-          GAME_PAGE: 2024_Summer_Olympics_medal_table
+          GAME_PAGE: 2026_Winter_Olympics_medal_table
+          GAMES_NAME: Milano Cortina 2026
+          PLACEHOLDER_COUNT: "10"
 
       - name: Commit changes
         run: |
