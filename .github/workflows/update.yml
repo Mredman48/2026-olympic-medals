@@ -2,7 +2,7 @@ name: Update medals JSON
 
 on:
   schedule:
-    - cron: "5 * * * *" # hourly at minute 5
+    - cron: "5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,9 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
 
-      # Use npm install (does not require package-lock.json)
       - run: npm install
 
       - name: Update medals
