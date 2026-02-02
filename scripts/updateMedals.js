@@ -25,7 +25,9 @@ function safeReadJson(filepath, fallback) {
 function flagUrlFromNoc(noc, nocToIso2) {
   const iso2 = nocToIso2[noc];
   if (!iso2) return null;
-  return `https://flagcdn.com/${iso2.toLowerCase()}.svg`;
+
+  // 40px wide PNG, @2x for retina (good balance of quality + size)
+  return `https://flagcdn.com/w40/${iso2.toLowerCase()}.png`;
 }
 
 /**
