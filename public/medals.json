@@ -1,120 +1,65 @@
 {
-  "updatedAt": "2026-02-07T17:10:38.804Z",
+  "updatedAt": "2026-02-07T17:15:14.503Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
   "gamePage": "2026_Winter_Olympics_medal_table",
-  "isLiveData": false,
+  "isLiveData": true,
   "rows": [
     {
       "rank": 1,
-      "noc": "ITA",
-      "name": "Italy",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/it.png",
-      "placeholder": true
+      "noc": "Italy*",
+      "name": "Italy*",
+      "gold": 1,
+      "silver": 1,
+      "bronze": 1,
+      "total": 3,
+      "flag": null,
+      "placeholder": false
     },
     {
       "rank": 2,
-      "noc": "SUI",
-      "name": "Switzerland",
-      "gold": 0,
-      "silver": 0,
+      "noc": "Sweden",
+      "name": "Sweden",
+      "gold": 1,
+      "silver": 1,
       "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/ch.png",
-      "placeholder": true
+      "total": 2,
+      "flag": null,
+      "placeholder": false
     },
     {
       "rank": 3,
-      "noc": "USA",
-      "name": "United States",
-      "gold": 0,
+      "noc": "Switzerland",
+      "name": "Switzerland",
+      "gold": 1,
       "silver": 0,
       "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/us.png",
-      "placeholder": true
+      "total": 1,
+      "flag": null,
+      "placeholder": false
     },
     {
       "rank": 4,
-      "noc": "CAN",
-      "name": "Canada",
+      "noc": "Norway",
+      "name": "Norway",
       "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/ca.png",
-      "placeholder": true
+      "silver": 1,
+      "bronze": 1,
+      "total": 2,
+      "flag": null,
+      "placeholder": false
     },
     {
       "rank": 5,
-      "noc": "GER",
-      "name": "Germany",
+      "noc": "Canada",
+      "name": "Canada",
       "gold": 0,
       "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/de.png",
-      "placeholder": true
-    },
-    {
-      "rank": 6,
-      "noc": "NOR",
-      "name": "Norway",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/no.png",
-      "placeholder": true
-    },
-    {
-      "rank": 7,
-      "noc": "SWE",
-      "name": "Sweden",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/se.png",
-      "placeholder": true
-    },
-    {
-      "rank": 8,
-      "noc": "FRA",
-      "name": "France",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/fr.png",
-      "placeholder": true
-    },
-    {
-      "rank": 9,
-      "noc": "AUT",
-      "name": "Austria",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/at.png",
-      "placeholder": true
-    },
-    {
-      "rank": 10,
-      "noc": "NED",
-      "name": "Netherlands",
-      "gold": 0,
-      "silver": 0,
-      "bronze": 0,
-      "total": 0,
-      "flag": "https://flagcdn.com/w40/nl.png",
-      "placeholder": true
+      "bronze": 1,
+      "total": 1,
+      "flag": null,
+      "placeholder": false
     }
   ]
 }
