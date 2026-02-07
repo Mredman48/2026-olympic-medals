@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
-import { load } from "cheerio";
 
-const GAME_PAGE = process.env.GAME_PAGE || "2026_Winter_Olympics_medal_table";
+// Use the portal page that is actively showing medal updates
+const SOURCE_PAGE = process.env.SOURCE_PAGE || "Portal:Olympic_Games/Celebration";
 const GAMES_NAME = process.env.GAMES_NAME || "Milano Cortina 2026";
 const PLACEHOLDER_COUNT = parseInt(process.env.PLACEHOLDER_COUNT || "10", 10);
 
 const OUT_FILE = path.join("public", "medals.json");
 const MAP_FILE = path.join("scripts", "noc_to_iso2.json");
 
+// ---- helpers ----
 function num(x) {
   const n = parseInt(String(x).replace(/[^\d]/g, ""), 10);
   return Number.isFinite(n) ? n : 0;
@@ -22,155 +23,129 @@ function safeReadJson(filepath, fallback) {
   }
 }
 
-function flagUrlFromNoc(noc, nocToIso2) {
-  const iso2 = nocToIso2[noc];
+/**
+ * Support mapping by:
+ * - NOC code (e.g., "ITA": "it")
+ * - Country name (e.g., "Switzerland": "ch")
+ *
+ * Put both kinds of keys into noc_to_iso2.json as needed.
+ */
+function flagUrlFromKey(nocOrName, map) {
+  const iso2 = map[nocOrName];
   if (!iso2) return null;
-
-  // 40px wide PNG, @2x for retina (good balance of quality + size)
-  return `https://flagcdn.com/w40/${iso2.toLowerCase()}.png`;
+  return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
 }
 
-/**
- * 10 placeholders until medals exist.
- * You can customize these countries however you want.
- */
-function buildPlaceholders(nocToIso2, count) {
+function buildPlaceholders(map, count) {
   const defaults = [
-    { noc: "ITA", name: "Italy" },
-    { noc: "USA", name: "United States" },
-    { noc: "CAN", name: "Canada" },
-    { noc: "GER", name: "Germany" },
-    { noc: "NOR", name: "Norway" },
-    { noc: "SWE", name: "Sweden" },
-    { noc: "FRA", name: "France" },
-    { noc: "SUI", name: "Switzerland" },
-    { noc: "AUT", name: "Austria" },
-    { noc: "NED", name: "Netherlands" }
+    { key: "Italy", label: "Italy" },
+    { key: "United States", label: "United States" },
+    { key: "Canada", label: "Canada" },
+    { key: "Germany", label: "Germany" },
+    { key: "Norway", label: "Norway" },
+    { key: "Sweden", label: "Sweden" },
+    { key: "France", label: "France" },
+    { key: "Switzerland", label: "Switzerland" },
+    { key: "Austria", label: "Austria" },
+    { key: "Netherlands", label: "Netherlands" }
   ];
 
-  const rows = [];
-  for (let i = 0; i < count; i++) {
+  return Array.from({ length: count }, (_, i) => {
     const base = defaults[i % defaults.length];
-    rows.push({
+    return {
       rank: i + 1,
-      noc: base.noc,
-      name: base.name,
+      name: base.label,
       gold: 0,
       silver: 0,
       bronze: 0,
       total: 0,
-      flag: flagUrlFromNoc(base.noc, nocToIso2),
+      flag: flagUrlFromKey(base.key, map),
       placeholder: true
-    });
-  }
-  return rows;
+    };
+  });
 }
 
-async function fetchWikipediaHtml(pageSlug) {
-  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(pageSlug)}`;
+async function fetchWikipediaText(page) {
+  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(page)}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "olympics-medals-widget/1.0 (GitHub Actions)" }
   });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
-  }
-
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
   const html = await res.text();
-  return { url, html };
+
+  // Simple text extraction: strip tags roughly; good enough for portal medal block parsing.
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<\/?[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { url, text };
 }
 
-function parseMedalTable(html, nocToIso2) {
-  const $ = load(html);
+/**
+ * Parses the portal's medal block which looks like:
+ * "2026 Winter Olympics Medal Table ... Rank NOC Gold Silver Bronze Total 1 ... Switzerland 1 0 0 1 2 ... Italy* 0 1 1 2 ..."
+ */
+function parsePortalMedalBlock(text, map) {
+  const anchor = "2026 Winter Olympics Medal Table";
+  const start = text.indexOf(anchor);
+  if (start === -1) return [];
 
-  // Find the medal table (usually a wikitable sortable with Gold/Silver/Bronze in header)
-  const tables = $("table.wikitable");
-  let medalTable = null;
+  // Take a chunk after the anchor; large enough to include the medal block.
+  const chunk = text.slice(start, start + 1200);
 
-  tables.each((_, t) => {
-    const headerText = $(t).find("tr").first().text().toLowerCase();
-    if (headerText.includes("gold") && headerText.includes("silver") && headerText.includes("bronze")) {
-      medalTable = t;
-      return false;
-    }
-  });
-
-  if (!medalTable) return [];
+  // Regex for rows: rank + country name + 4 medal numbers
+  // Country names can include spaces, apostrophes, hyphens; host has trailing *.
+  const rowRe = /\b(\d+)\s+([A-Za-z][A-Za-z'’.\- ]*?)(\*)?\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\b/g;
 
   const rows = [];
-  $(medalTable)
-    .find("tr")
-    .slice(1)
-    .each((_, tr) => {
-      const cells = $(tr).find("th, td");
-      if (cells.length < 6) return;
+  for (const m of chunk.matchAll(rowRe)) {
+    const rank = num(m[1]);
+    const nameRaw = (m[2] || "").trim();
+    const name = nameRaw.replace(/\s+/g, " ");
+    const gold = num(m[4]);
+    const silver = num(m[5]);
+    const bronze = num(m[6]);
+    const total = num(m[7]);
 
-      const rank = num($(cells[0]).text());
+    // Skip totals line if it ever matches
+    if (!name || name.toLowerCase().startsWith("totals")) continue;
 
-      // NOC cell often looks like: "Italy (ITA)"
-      const nocCellText = $(cells[1]).text().replace(/\s+/g, " ").trim();
-
-      let noc = null;
-      const m = nocCellText.match(/\(([A-Z]{3})\)\s*$/);
-      if (m) noc = m[1];
-
-      if (!noc) {
-        const tokens = nocCellText.split(" ");
-        const last = tokens[tokens.length - 1];
-        if (/^[A-Z]{3}$/.test(last)) noc = last;
-      }
-
-      const name = noc
-        ? nocCellText.replace(new RegExp(`\\s*\$begin:math:text$\$\{noc\}\\$end:math:text$\\s*$`), "").trim()
-        : nocCellText;
-
-      const gold = num($(cells[2]).text());
-      const silver = num($(cells[3]).text());
-      const bronze = num($(cells[4]).text());
-      const total = num($(cells[5]).text());
-
-      // Ignore footer/weird rows
-      if (!noc || !name) return;
-
-      rows.push({
-        rank: rank || rows.length + 1,
-        noc,
-        name,
-        gold,
-        silver,
-        bronze,
-        total,
-        flag: flagUrlFromNoc(noc, nocToIso2),
-        placeholder: false
-      });
+    rows.push({
+      rank,
+      name,
+      gold,
+      silver,
+      bronze,
+      total,
+      flag: flagUrlFromKey(name, map),
+      placeholder: false
     });
+  }
 
-  // Keep only meaningful medal rows (once games start)
-  const hasAnyMedals = rows.some(r => (r.gold + r.silver + r.bronze) > 0);
-  if (!hasAnyMedals) return [];
-
+  // Sort and return top 10
   rows.sort((a, b) => a.rank - b.rank);
   return rows;
 }
 
 async function main() {
-  const nocToIso2 = safeReadJson(MAP_FILE, {});
+  const map = safeReadJson(MAP_FILE, {});
 
-  // Fetch & parse. If medal data not present yet, we will fall back to placeholders.
-  const { url, html } = await fetchWikipediaHtml(GAME_PAGE);
-  const parsedRows = parseMedalTable(html, nocToIso2);
+  const { url, text } = await fetchWikipediaText(SOURCE_PAGE);
+  const parsedRows = parsePortalMedalBlock(text, map);
 
-  const finalRows =
-    parsedRows.length > 0
-      ? parsedRows.slice(0, 10) // top 10 for your widget
-      : buildPlaceholders(nocToIso2, PLACEHOLDER_COUNT);
+  const finalRows = parsedRows.length > 0 ? parsedRows.slice(0, 10) : buildPlaceholders(map, PLACEHOLDER_COUNT);
 
   const payload = {
     updatedAt: new Date().toISOString(),
     source: "Wikipedia",
     sourceUrl: url,
     games: GAMES_NAME,
-    gamePage: GAME_PAGE,
+    sourcePage: SOURCE_PAGE,
     isLiveData: parsedRows.length > 0,
     rows: finalRows
   };
@@ -178,9 +153,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(
-    `Wrote ${OUT_FILE} with ${finalRows.length} rows (${payload.isLiveData ? "live" : "placeholder"}) from ${url}`
-  );
+  console.log(`Wrote ${OUT_FILE} with ${finalRows.length} rows (${payload.isLiveData ? "live" : "placeholder"})`);
 }
 
 main().catch((err) => {
