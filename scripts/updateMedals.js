@@ -22,7 +22,7 @@ function flagPngFromIso2(iso2) {
   return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
 }
 
-// ---- Maps (extend as needed) ----
+// ---- Minimal maps (extend as needed) ----
 const NOC_TO_ISO2 = {
   ITA: "it",
   SUI: "ch",
@@ -50,43 +50,40 @@ const NOC_TO_ISO2 = {
 };
 
 const NAME_TO_NOC = {
-  "Italy": "ITA",
-  "Switzerland": "SUI",
-  "France": "FRA",
-  "Germany": "GER",
+  Italy: "ITA",
+  Switzerland: "SUI",
+  France: "FRA",
+  Germany: "GER",
   "United States": "USA",
-  "Canada": "CAN",
-  "Austria": "AUT",
-  "Netherlands": "NED",
-  "Norway": "NOR",
-  "Sweden": "SWE",
-  "Finland": "FIN",
-  "Czechia": "CZE",
+  Canada: "CAN",
+  Austria: "AUT",
+  Netherlands: "NED",
+  Norway: "NOR",
+  Sweden: "SWE",
+  Finland: "FIN",
+  Czechia: "CZE",
   "Czech Republic": "CZE",
-  "Slovakia": "SVK",
-  "Slovenia": "SLO",
-  "Poland": "POL",
-  "Hungary": "HUN",
-  "Latvia": "LAT",
-  "Lithuania": "LTU",
-  "Estonia": "EST",
+  Slovakia: "SVK",
+  Slovenia: "SLO",
+  Poland: "POL",
+  Hungary: "HUN",
+  Latvia: "LAT",
+  Lithuania: "LTU",
+  Estonia: "EST",
   "Great Britain": "GBR",
   "United Kingdom": "GBR",
-  "Japan": "JPN",
+  Japan: "JPN",
   "South Korea": "KOR",
-  "Korea": "KOR",
-  "China": "CHN"
+  Korea: "KOR",
+  China: "CHN"
 };
 
-function inferNoc(countryName, cellText) {
-  const t = String(cellText || "").replace(/\s+/g, " ").trim();
-
+function inferNoc(countryName, rawCellText) {
+  const t = String(rawCellText || "").replace(/\s+/g, " ").trim();
   const m = t.match(/\(([A-Z]{3})\)\s*$/);
   if (m) return m[1];
-
   const last = t.split(" ").pop();
   if (/^[A-Z]{3}$/.test(last)) return last;
-
   return NAME_TO_NOC[countryName] || null;
 }
 
@@ -142,10 +139,19 @@ async function fetchParsedHtml(pageTitle) {
   };
 }
 
-// ---- Parse medal table ----
-function parseMedalTable(html) {
+/**
+ * Key change:
+ * - DO NOT trust fixed column indexes because Rank often rowspans on ties
+ * - For each row:
+ *   - If first cell is a numeric rank -> skip it
+ *   - Then treat the next cell as Country/NOC column (Column 2)
+ *   - Then read gold/silver/bronze/total from subsequent cells
+ * - Take the FIRST TOP_N rows in table order (no sorting, no rank logic)
+ */
+function parseTopRowsInDisplayOrder(html, topN) {
   const $ = load(html);
 
+  // Find the medal table by header
   let medalTable = null;
   $("table.wikitable").each((_, t) => {
     const header = $(t).find("tr").first().text().toLowerCase();
@@ -159,79 +165,74 @@ function parseMedalTable(html) {
 
   const rows = [];
 
-  $(medalTable).find("tr").slice(1).each((_, tr) => {
-    const cells = $(tr).find("th, td");
-    if (cells.length < 6) return;
+  $(medalTable)
+    .find("tr")
+    .slice(1)
+    .each((_, tr) => {
+      if (rows.length >= topN) return;
 
-    const countryCell = $(cells[1]);
+      const cells = $(tr).children("th, td");
+      if (cells.length < 5) return; // must at least have country + 4 medal cols (rank may be missing)
 
-    // Country name from DOM
-    let name =
-      countryCell
-        .find('a[href^="/wiki/"]')
-        .first()
-        .text()
-        .replace(/\s+/g, " ")
-        .trim() || countryCell.text().replace(/\s+/g, " ").trim();
+      // If first cell is a numeric rank, ignore it (Column 1)
+      const firstText = $(cells[0]).text().replace(/\s+/g, " ").trim();
+      const firstIsRank = /^[0-9]+$/.test(firstText);
 
-    name = name.replace(/\*+$/g, "").trim();
-    if (!name) return;
-    if (name.toLowerCase().startsWith("totals")) return;
+      const start = firstIsRank ? 1 : 0;
 
-    const gold = num($(cells[2]).text());
-    const silver = num($(cells[3]).text());
-    const bronze = num($(cells[4]).text());
-    const total = num($(cells[5]).text());
+      // Column 2 (country/NOC column) in display terms
+      const countryCell = $(cells[start]);
+      if (!countryCell || countryCell.length === 0) return;
 
-    const noc = inferNoc(name, countryCell.text());
-    const flag = noc ? inferFlag(noc) : null;
+      // Country name from DOM (link text) or fallback text
+      let name =
+        countryCell
+          .find('a[href^="/wiki/"]')
+          .first()
+          .text()
+          .replace(/\s+/g, " ")
+          .trim() || countryCell.text().replace(/\s+/g, " ").trim();
 
-    rows.push({
-      // rank will be re-assigned after sorting to 1..TOP_N
-      rank: null,
-      noc: noc || name,
-      name,
-      gold,
-      silver,
-      bronze,
-      total,
-      flag,
-      placeholder: false
+      name = name.replace(/\*+$/g, "").trim();
+      if (!name) return;
+      if (name.toLowerCase().startsWith("totals")) return;
+
+      // Medal columns come immediately after country cell
+      const gold = num($(cells[start + 1]).text());
+      const silver = num($(cells[start + 2]).text());
+      const bronze = num($(cells[start + 3]).text());
+      const total = num($(cells[start + 4]).text());
+
+      const noc = inferNoc(name, countryCell.text());
+      const flag = noc ? inferFlag(noc) : null;
+
+      rows.push({
+        rank: rows.length + 1, // display-only 1..TOP_N (since you said rank doesn't matter)
+        noc: noc || name,
+        name,
+        gold,
+        silver,
+        bronze,
+        total,
+        flag,
+        placeholder: false
+      });
     });
-  });
 
   return rows;
-}
-
-// ---- Sorting: ignore Wikipedia rank ----
-function sortByMedals(rows) {
-  return rows.sort((a, b) => {
-    if (b.gold !== a.gold) return b.gold - a.gold;
-    if (b.silver !== a.silver) return b.silver - a.silver;
-    if (b.bronze !== a.bronze) return b.bronze - a.bronze;
-    if (b.total !== a.total) return b.total - a.total;
-    return String(a.name).localeCompare(String(b.name));
-  });
 }
 
 // ---- Main ----
 async function main() {
   const { sourceUrl, html } = await fetchParsedHtml(GAME_PAGE);
 
-  const parsedRows = parseMedalTable(html);
-  const hasAnyMedals = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
+  const topRows = parseTopRowsInDisplayOrder(html, TOP_N);
+  const hasAnyMedals = topRows.some(r => (r.gold + r.silver + r.bronze) > 0);
 
-  let finalRows;
-
-  if (parsedRows.length === 0) {
-    finalRows = buildPlaceholders(Math.max(TOP_N, PLACEHOLDER_COUNT)).slice(0, TOP_N);
-  } else {
-    const sorted = sortByMedals(parsedRows);
-    finalRows = sorted.slice(0, TOP_N).map((r, i) => ({
-      ...r,
-      rank: i + 1 // display-only rank, not Wikipedia rank
-    }));
-  }
+  const finalRows =
+    topRows.length === TOP_N
+      ? topRows
+      : buildPlaceholders(Math.max(PLACEHOLDER_COUNT, TOP_N)).slice(0, TOP_N);
 
   const payload = {
     updatedAt: new Date().toISOString(),
@@ -246,7 +247,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`Wrote ${OUT_FILE} top=${TOP_N} live=${hasAnyMedals} rows=${finalRows.length}`);
+  console.log(`Wrote ${OUT_FILE} top=${TOP_N} rows=${finalRows.length} live=${hasAnyMedals}`);
 }
 
 main().catch((err) => {
