@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { load } from "cheerio";
 
-const PAGE = process.env.GAME_PAGE || "2026_Winter_Olympics_medal_table";
+const GAME_PAGE = process.env.GAME_PAGE || "2026_Winter_Olympics_medal_table";
 const GAMES_NAME = process.env.GAMES_NAME || "Milano Cortina 2026";
 const PLACEHOLDER_COUNT = parseInt(process.env.PLACEHOLDER_COUNT || "10", 10);
 
@@ -25,7 +25,7 @@ function safeReadJson(filepath, fallback) {
 function flagUrlFromNoc(noc, nocToIso2) {
   const iso2 = nocToIso2[noc];
   if (!iso2) return null;
-  return `https://flagcdn.com/w40/${iso2.toLowerCase()}.png`;
+  return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
 }
 
 function buildPlaceholders(nocToIso2, count) {
@@ -59,7 +59,7 @@ function buildPlaceholders(nocToIso2, count) {
 }
 
 /**
- * Fetches parsed HTML via MediaWiki API (more consistent than scraping the page HTML)
+ * MediaWiki API parse = consistent HTML for bots
  */
 async function fetchParsedHtml(pageTitle) {
   const apiUrl =
@@ -78,19 +78,13 @@ async function fetchParsedHtml(pageTitle) {
 
   return {
     sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
-    apiUrl,
     html
   };
 }
 
-/**
- * Finds medal table and parses:
- * Rank | NOC | Gold | Silver | Bronze | Total
- */
-function parseMedalTableFromHtml(html, nocToIso2) {
+function parseMedalTable(html, nocToIso2) {
   const $ = load(html);
 
-  // Wikipedia often uses class="wikitable sortable plainrowheaders"
   const tables = $("table.wikitable");
   let medalTable = null;
 
@@ -105,17 +99,15 @@ function parseMedalTableFromHtml(html, nocToIso2) {
   if (!medalTable) return [];
 
   const rows = [];
-
   $(medalTable).find("tr").slice(1).each((_, tr) => {
     const cells = $(tr).find("th, td");
     if (cells.length < 6) return;
 
     const rank = num($(cells[0]).text()) || (rows.length + 1);
 
-    // NOC cell usually contains the country page link + (sometimes) IOC code in small text.
     const nocCellText = $(cells[1]).text().replace(/\s+/g, " ").trim();
 
-    // Try to extract IOC/NOC code if present like "(ITA)" or trailing "ITA"
+    // Try to extract IOC code if present
     let noc = null;
     const m = nocCellText.match(/\(([A-Z]{3})\)\s*$/);
     if (m) noc = m[1];
@@ -125,8 +117,6 @@ function parseMedalTableFromHtml(html, nocToIso2) {
       if (/^[A-Z]{3}$/.test(last)) noc = last;
     }
 
-    // If the page omits codes, fall back to known special cases (and you can extend this)
-    // Example: Italy row often has a host star; name is still "Italy"
     const name = noc
       ? nocCellText.replace(new RegExp(`\\s*\$begin:math:text$\$\{noc\}\\$end:math:text$\\s*$`), "").trim()
       : nocCellText;
@@ -136,58 +126,53 @@ function parseMedalTableFromHtml(html, nocToIso2) {
     const bronze = num($(cells[4]).text());
     const total = num($(cells[5]).text());
 
-    // Ignore totals/footer rows
-    if (name.toLowerCase().startsWith("totals")) return;
-    if (!name) return;
+    if (!name || name.toLowerCase().startsWith("totals")) return;
+    if (!noc) return; // keep schema stable: require noc for flags + Widgy bindings
 
     rows.push({
       rank,
-      noc: noc || null,
+      noc,
       name,
       gold,
       silver,
       bronze,
       total,
-      flag: noc ? flagUrlFromNoc(noc, nocToIso2) : null,
+      flag: flagUrlFromNoc(noc, nocToIso2),
       placeholder: false
     });
   });
 
-  // If we found rows, keep them; if medals are still all zeros, caller may choose placeholders.
   rows.sort((a, b) => a.rank - b.rank);
   return rows;
 }
 
 async function main() {
   const nocToIso2 = safeReadJson(MAP_FILE, {});
+  const { sourceUrl, html } = await fetchParsedHtml(GAME_PAGE);
 
-  const { sourceUrl, apiUrl, html } = await fetchParsedHtml(PAGE);
-  const parsedRows = parseMedalTableFromHtml(html, nocToIso2);
+  const parsedRows = parseMedalTable(html, nocToIso2);
 
-  // “Live” if any medal exists
-  const hasAnyMedals = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
+  const isLiveData = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
 
-  const finalRows = hasAnyMedals
+  const finalRows = isLiveData
     ? parsedRows.slice(0, 10)
     : buildPlaceholders(nocToIso2, PLACEHOLDER_COUNT);
 
+  // ✅ Keep the original JSON layout your Widgy widget expects
   const payload = {
     updatedAt: new Date().toISOString(),
-    source: "Wikipedia (MediaWiki API parse)",
+    source: "Wikipedia",
     sourceUrl,
-    apiUrl,
     games: GAMES_NAME,
-    page: PAGE,
-    isLiveData: hasAnyMedals,
+    gamePage: GAME_PAGE,
+    isLiveData,
     rows: finalRows
   };
 
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(
-    `Wrote ${OUT_FILE} with ${finalRows.length} rows (${payload.isLiveData ? "live" : "placeholder"})`
-  );
+  console.log(`Wrote ${OUT_FILE} (${isLiveData ? "live" : "placeholder"})`);
 }
 
 main().catch((err) => {
