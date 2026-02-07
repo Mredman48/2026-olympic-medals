@@ -7,23 +7,22 @@ import { load } from "cheerio";
 const GAME_PAGE = process.env.GAME_PAGE || "2026_Winter_Olympics_medal_table";
 const GAMES_NAME = process.env.GAMES_NAME || "Milano Cortina 2026";
 const PLACEHOLDER_COUNT = parseInt(process.env.PLACEHOLDER_COUNT || "10", 10);
+const TOP_N = parseInt(process.env.TOP_N || "5", 10);
 
 const OUT_FILE = path.join("public", "medals.json");
 
-// ---- Helper functions ----
+// ---- Helpers ----
 function num(x) {
   const n = parseInt(String(x).replace(/[^\d]/g, ""), 10);
   return Number.isFinite(n) ? n : 0;
 }
 
-// FlagCDN PNG (Widgy-friendly)
 function flagPngFromIso2(iso2) {
   if (!iso2) return null;
   return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
 }
 
-// ---- Maps (self-contained; no extra JSON files needed) ----
-// Expand these as needed. This set covers common Winter powers + your placeholders.
+// ---- Maps (extend as needed) ----
 const NOC_TO_ISO2 = {
   ITA: "it",
   SUI: "ch",
@@ -47,17 +46,9 @@ const NOC_TO_ISO2 = {
   GBR: "gb",
   JPN: "jp",
   KOR: "kr",
-  CHN: "cn",
-  ESP: "es",
-  BRA: "br",
-  NZL: "nz",
-  AUS: "au",
-  DEN: "dk",
-  BEL: "be",
-  LIE: "li"
+  CHN: "cn"
 };
 
-// Country name → NOC (this is the key fix)
 const NAME_TO_NOC = {
   "Italy": "ITA",
   "Switzerland": "SUI",
@@ -70,8 +61,8 @@ const NAME_TO_NOC = {
   "Norway": "NOR",
   "Sweden": "SWE",
   "Finland": "FIN",
-  "Czech Republic": "CZE",
   "Czechia": "CZE",
+  "Czech Republic": "CZE",
   "Slovakia": "SVK",
   "Slovenia": "SLO",
   "Poland": "POL",
@@ -84,18 +75,10 @@ const NAME_TO_NOC = {
   "Japan": "JPN",
   "South Korea": "KOR",
   "Korea": "KOR",
-  "China": "CHN",
-  "Spain": "ESP",
-  "Brazil": "BRA",
-  "New Zealand": "NZL",
-  "Australia": "AUS",
-  "Denmark": "DEN",
-  "Belgium": "BEL",
-  "Liechtenstein": "LIE"
+  "China": "CHN"
 };
 
 function inferNoc(countryName, cellText) {
-  // Try to grab "(ABC)" or trailing ABC from visible text if present
   const t = String(cellText || "").replace(/\s+/g, " ").trim();
 
   const m = t.match(/\(([A-Z]{3})\)\s*$/);
@@ -104,11 +87,10 @@ function inferNoc(countryName, cellText) {
   const last = t.split(" ").pop();
   if (/^[A-Z]{3}$/.test(last)) return last;
 
-  // Fall back to our name mapping
   return NAME_TO_NOC[countryName] || null;
 }
 
-function inferFlagPng(noc) {
+function inferFlag(noc) {
   const iso2 = NOC_TO_ISO2[noc];
   return flagPngFromIso2(iso2);
 }
@@ -117,14 +99,9 @@ function buildPlaceholders(count) {
   const defaults = [
     { name: "Italy", noc: "ITA" },
     { name: "Switzerland", noc: "SUI" },
-    { name: "United States", noc: "USA" },
-    { name: "Canada", noc: "CAN" },
-    { name: "Germany", noc: "GER" },
     { name: "Norway", noc: "NOR" },
-    { name: "Sweden", noc: "SWE" },
-    { name: "France", noc: "FRA" },
-    { name: "Austria", noc: "AUT" },
-    { name: "Netherlands", noc: "NED" }
+    { name: "Germany", noc: "GER" },
+    { name: "Canada", noc: "CAN" }
   ];
 
   return Array.from({ length: count }, (_, i) => {
@@ -137,13 +114,13 @@ function buildPlaceholders(count) {
       silver: 0,
       bronze: 0,
       total: 0,
-      flag: inferFlagPng(base.noc),
+      flag: inferFlag(base.noc),
       placeholder: true
     };
   });
 }
 
-// ---- Wikipedia via MediaWiki API (parse) ----
+// ---- Wikipedia (MediaWiki API parse) ----
 async function fetchParsedHtml(pageTitle) {
   const apiUrl =
     "https://en.wikipedia.org/w/api.php" +
@@ -161,20 +138,16 @@ async function fetchParsedHtml(pageTitle) {
 
   return {
     sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
-    apiUrl,
     html
   };
 }
 
-// ---- Parsing medal table ----
+// ---- Parse medal table ----
 function parseMedalTable(html) {
   const $ = load(html);
 
-  // Find medal table by header content
-  const tables = $("table.wikitable");
   let medalTable = null;
-
-  tables.each((_, t) => {
+  $("table.wikitable").each((_, t) => {
     const header = $(t).find("tr").first().text().toLowerCase();
     if (header.includes("gold") && header.includes("silver") && header.includes("bronze") && header.includes("total")) {
       medalTable = t;
@@ -190,11 +163,9 @@ function parseMedalTable(html) {
     const cells = $(tr).find("th, td");
     if (cells.length < 6) return;
 
-    const rank = num($(cells[0]).text()) || (rows.length + 1);
-
     const countryCell = $(cells[1]);
 
-    // DOM-first country name extraction (more reliable than raw text)
+    // Country name from DOM
     let name =
       countryCell
         .find('a[href^="/wiki/"]')
@@ -203,25 +174,22 @@ function parseMedalTable(html) {
         .replace(/\s+/g, " ")
         .trim() || countryCell.text().replace(/\s+/g, " ").trim();
 
-    // Strip host markers like "Italy*"
     name = name.replace(/\*+$/g, "").trim();
     if (!name) return;
     if (name.toLowerCase().startsWith("totals")) return;
-
-    const cellText = countryCell.text();
-    const noc = inferNoc(name, cellText);
 
     const gold = num($(cells[2]).text());
     const silver = num($(cells[3]).text());
     const bronze = num($(cells[4]).text());
     const total = num($(cells[5]).text());
 
-    // If we cannot infer NOC, still emit row but leave flag null
-    const flag = noc ? inferFlagPng(noc) : null;
+    const noc = inferNoc(name, countryCell.text());
+    const flag = noc ? inferFlag(noc) : null;
 
     rows.push({
-      rank,
-      noc: noc || name, // keep non-empty so Widgy bindings don't break
+      // rank will be re-assigned after sorting to 1..TOP_N
+      rank: null,
+      noc: noc || name,
       name,
       gold,
       silver,
@@ -232,42 +200,53 @@ function parseMedalTable(html) {
     });
   });
 
-  rows.sort((a, b) => a.rank - b.rank);
   return rows;
+}
+
+// ---- Sorting: ignore Wikipedia rank ----
+function sortByMedals(rows) {
+  return rows.sort((a, b) => {
+    if (b.gold !== a.gold) return b.gold - a.gold;
+    if (b.silver !== a.silver) return b.silver - a.silver;
+    if (b.bronze !== a.bronze) return b.bronze - a.bronze;
+    if (b.total !== a.total) return b.total - a.total;
+    return String(a.name).localeCompare(String(b.name));
+  });
 }
 
 // ---- Main ----
 async function main() {
-  const { sourceUrl, apiUrl, html } = await fetchParsedHtml(GAME_PAGE);
+  const { sourceUrl, html } = await fetchParsedHtml(GAME_PAGE);
 
   const parsedRows = parseMedalTable(html);
+  const hasAnyMedals = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
 
-  // Consider "live" if any medals are present
-  const isLiveData = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
+  let finalRows;
 
-  const finalRows =
-    parsedRows.length > 0
-      ? parsedRows.slice(0, 10)
-      : buildPlaceholders(PLACEHOLDER_COUNT);
+  if (parsedRows.length === 0) {
+    finalRows = buildPlaceholders(Math.max(TOP_N, PLACEHOLDER_COUNT)).slice(0, TOP_N);
+  } else {
+    const sorted = sortByMedals(parsedRows);
+    finalRows = sorted.slice(0, TOP_N).map((r, i) => ({
+      ...r,
+      rank: i + 1 // display-only rank, not Wikipedia rank
+    }));
+  }
 
-  // Keep Widgy-friendly JSON shape
   const payload = {
     updatedAt: new Date().toISOString(),
     source: "Wikipedia",
     sourceUrl,
     games: GAMES_NAME,
     gamePage: GAME_PAGE,
-    isLiveData,
+    isLiveData: hasAnyMedals,
     rows: finalRows
   };
-
-  // (Optional) leave apiUrl out to keep schema stable; uncomment if you want it.
-  // payload.apiUrl = apiUrl;
 
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`Wrote ${OUT_FILE} live=${isLiveData} rows=${finalRows.length}`);
+  console.log(`Wrote ${OUT_FILE} top=${TOP_N} live=${hasAnyMedals} rows=${finalRows.length}`);
 }
 
 main().catch((err) => {
