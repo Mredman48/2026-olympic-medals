@@ -1,12 +1,12 @@
 {
-  "Italy": "ITA",
-  "Switzerland": "SUI",
-  "France": "FRA",
-  "Germany": "GER",
-  "United States": "USA",
-  "Canada": "CAN",
-  "Austria": "AUT",
-  "Netherlands": "NED",
-  "Norway": "NOR",
-  "Sweden": "SWE"
+  "ITA": "it",
+  "SUI": "ch",
+  "FRA": "fr",
+  "GER": "de",
+  "USA": "us",
+  "CAN": "ca",
+  "AUT": "at",
+  "NED": "nl",
+  "NOR": "no",
+  "SWE": "se"
 }
