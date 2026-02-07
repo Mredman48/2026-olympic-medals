@@ -22,13 +22,15 @@ function safeReadJson(filepath, fallback) {
   }
 }
 
-function flagUrlFromNoc(noc, nocToIso2) {
-  const iso2 = nocToIso2[noc];
+// Try iso2 lookup by NOC or by country name (you’ll add both keys in noc_to_iso2.json)
+function flagUrlFromKey(key, map) {
+  if (!key) return null;
+  const iso2 = map[key];
   if (!iso2) return null;
   return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
 }
 
-function buildPlaceholders(nocToIso2, count) {
+function buildPlaceholders(map, count) {
   const defaults = [
     { noc: "ITA", name: "Italy" },
     { noc: "SUI", name: "Switzerland" },
@@ -52,15 +54,12 @@ function buildPlaceholders(nocToIso2, count) {
       silver: 0,
       bronze: 0,
       total: 0,
-      flag: flagUrlFromNoc(base.noc, nocToIso2),
+      flag: flagUrlFromKey(base.noc, map) || flagUrlFromKey(base.name, map),
       placeholder: true
     };
   });
 }
 
-/**
- * MediaWiki API parse = consistent HTML for bots
- */
 async function fetchParsedHtml(pageTitle) {
   const apiUrl =
     "https://en.wikipedia.org/w/api.php" +
@@ -82,7 +81,7 @@ async function fetchParsedHtml(pageTitle) {
   };
 }
 
-function parseMedalTable(html, nocToIso2) {
+function parseMedalTable(html, map) {
   const $ = load(html);
 
   const tables = $("table.wikitable");
@@ -105,39 +104,42 @@ function parseMedalTable(html, nocToIso2) {
 
     const rank = num($(cells[0]).text()) || (rows.length + 1);
 
-    const nocCellText = $(cells[1]).text().replace(/\s+/g, " ").trim();
+    // Country cell
+    const raw = $(cells[1]).text().replace(/\s+/g, " ").trim();
+    if (!raw) return;
 
-    // Try to extract IOC code if present
+    // Sometimes Wikipedia puts "(ITA)" etc in text; try to extract
     let noc = null;
-    const m = nocCellText.match(/\(([A-Z]{3})\)\s*$/);
+    const m = raw.match(/\(([A-Z]{3})\)\s*$/);
     if (m) noc = m[1];
-
     if (!noc) {
-      const last = nocCellText.split(" ").pop();
+      const last = raw.split(" ").pop();
       if (/^[A-Z]{3}$/.test(last)) noc = last;
     }
 
-    const name = noc
-      ? nocCellText.replace(new RegExp(`\\s*\$begin:math:text$\$\{noc\}\\$end:math:text$\\s*$`), "").trim()
-      : nocCellText;
+    // Name without trailing "(NOC)"
+    const name = noc ? raw.replace(new RegExp(`\\s*\$begin:math:text$\$\{noc\}\\$end:math:text$\\s*$`), "").trim() : raw;
 
+    // Medal counts
     const gold = num($(cells[2]).text());
     const silver = num($(cells[3]).text());
     const bronze = num($(cells[4]).text());
     const total = num($(cells[5]).text());
 
-    if (!name || name.toLowerCase().startsWith("totals")) return;
-    if (!noc) return; // keep schema stable: require noc for flags + Widgy bindings
+    if (name.toLowerCase().startsWith("totals")) return;
+
+    // Flag from NOC first, fallback to country name
+    const flag = flagUrlFromKey(noc, map) || flagUrlFromKey(name, map);
 
     rows.push({
       rank,
-      noc,
+      noc: noc || name, // keep a stable non-empty key for Widgy bindings
       name,
       gold,
       silver,
       bronze,
       total,
-      flag: flagUrlFromNoc(noc, nocToIso2),
+      flag,
       placeholder: false
     });
   });
@@ -147,18 +149,18 @@ function parseMedalTable(html, nocToIso2) {
 }
 
 async function main() {
-  const nocToIso2 = safeReadJson(MAP_FILE, {});
+  const map = safeReadJson(MAP_FILE, {});
   const { sourceUrl, html } = await fetchParsedHtml(GAME_PAGE);
 
-  const parsedRows = parseMedalTable(html, nocToIso2);
+  const parsedRows = parseMedalTable(html, map);
 
   const isLiveData = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
 
-  const finalRows = isLiveData
+  const finalRows = parsedRows.length > 0
     ? parsedRows.slice(0, 10)
-    : buildPlaceholders(nocToIso2, PLACEHOLDER_COUNT);
+    : buildPlaceholders(map, PLACEHOLDER_COUNT);
 
-  // ✅ Keep the original JSON layout your Widgy widget expects
+  // ✅ Original schema (Widgy-friendly)
   const payload = {
     updatedAt: new Date().toISOString(),
     source: "Wikipedia",
@@ -172,7 +174,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`Wrote ${OUT_FILE} (${isLiveData ? "live" : "placeholder"})`);
+  console.log(`Wrote ${OUT_FILE} (${payload.isLiveData ? "live" : "not-live"}) rows=${finalRows.length}`);
 }
 
 main().catch((err) => {
