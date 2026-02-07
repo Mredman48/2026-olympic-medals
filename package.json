@@ -9,3 +9,10 @@
     "cheerio": "^1.0.0-rc.12"
   }
 }
+
+{
+  "scripts": {
+    "build:mappings": "node scripts/buildNocMappings.js",
+    "update": "node scripts/updateMedals.js"
+  }
+}
