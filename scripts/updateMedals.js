@@ -1,15 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import { load } from "cheerio";
 
-// Use the portal page that is actively showing medal updates
-const SOURCE_PAGE = process.env.SOURCE_PAGE || "Portal:Olympic_Games/Celebration";
+const PAGE = process.env.GAME_PAGE || "2026_Winter_Olympics_medal_table";
 const GAMES_NAME = process.env.GAMES_NAME || "Milano Cortina 2026";
 const PLACEHOLDER_COUNT = parseInt(process.env.PLACEHOLDER_COUNT || "10", 10);
 
 const OUT_FILE = path.join("public", "medals.json");
 const MAP_FILE = path.join("scripts", "noc_to_iso2.json");
 
-// ---- helpers ----
 function num(x) {
   const n = parseInt(String(x).replace(/[^\d]/g, ""), 10);
   return Number.isFinite(n) ? n : 0;
@@ -23,137 +22,172 @@ function safeReadJson(filepath, fallback) {
   }
 }
 
-/**
- * Support mapping by:
- * - NOC code (e.g., "ITA": "it")
- * - Country name (e.g., "Switzerland": "ch")
- *
- * Put both kinds of keys into noc_to_iso2.json as needed.
- */
-function flagUrlFromKey(nocOrName, map) {
-  const iso2 = map[nocOrName];
+function flagUrlFromNoc(noc, nocToIso2) {
+  const iso2 = nocToIso2[noc];
   if (!iso2) return null;
-  return `https://flagcdn.com/w40/${String(iso2).toLowerCase()}.png`;
+  return `https://flagcdn.com/w40/${iso2.toLowerCase()}.png`;
 }
 
-function buildPlaceholders(map, count) {
+function buildPlaceholders(nocToIso2, count) {
   const defaults = [
-    { key: "Italy", label: "Italy" },
-    { key: "United States", label: "United States" },
-    { key: "Canada", label: "Canada" },
-    { key: "Germany", label: "Germany" },
-    { key: "Norway", label: "Norway" },
-    { key: "Sweden", label: "Sweden" },
-    { key: "France", label: "France" },
-    { key: "Switzerland", label: "Switzerland" },
-    { key: "Austria", label: "Austria" },
-    { key: "Netherlands", label: "Netherlands" }
+    { noc: "ITA", name: "Italy" },
+    { noc: "SUI", name: "Switzerland" },
+    { noc: "USA", name: "United States" },
+    { noc: "CAN", name: "Canada" },
+    { noc: "GER", name: "Germany" },
+    { noc: "NOR", name: "Norway" },
+    { noc: "SWE", name: "Sweden" },
+    { noc: "FRA", name: "France" },
+    { noc: "AUT", name: "Austria" },
+    { noc: "NED", name: "Netherlands" }
   ];
 
   return Array.from({ length: count }, (_, i) => {
     const base = defaults[i % defaults.length];
     return {
       rank: i + 1,
-      name: base.label,
+      noc: base.noc,
+      name: base.name,
       gold: 0,
       silver: 0,
       bronze: 0,
       total: 0,
-      flag: flagUrlFromKey(base.key, map),
+      flag: flagUrlFromNoc(base.noc, nocToIso2),
       placeholder: true
     };
   });
 }
 
-async function fetchWikipediaText(page) {
-  const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(page)}`;
-  const res = await fetch(url, {
+/**
+ * Fetches parsed HTML via MediaWiki API (more consistent than scraping the page HTML)
+ */
+async function fetchParsedHtml(pageTitle) {
+  const apiUrl =
+    "https://en.wikipedia.org/w/api.php" +
+    `?action=parse&format=json&prop=text&formatversion=2&redirects=1&origin=*` +
+    `&page=${encodeURIComponent(pageTitle)}`;
+
+  const res = await fetch(apiUrl, {
     headers: { "User-Agent": "olympics-medals-widget/1.0 (GitHub Actions)" }
   });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
-  const html = await res.text();
+  if (!res.ok) throw new Error(`Failed to fetch MediaWiki API: ${res.status} ${res.statusText}`);
 
-  // Simple text extraction: strip tags roughly; good enough for portal medal block parsing.
-  const text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<\/?[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+  const data = await res.json();
+  const html = data?.parse?.text;
+  if (!html) throw new Error("MediaWiki API parse response missing HTML content");
 
-  return { url, text };
+  return {
+    sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`,
+    apiUrl,
+    html
+  };
 }
 
 /**
- * Parses the portal's medal block which looks like:
- * "2026 Winter Olympics Medal Table ... Rank NOC Gold Silver Bronze Total 1 ... Switzerland 1 0 0 1 2 ... Italy* 0 1 1 2 ..."
+ * Finds medal table and parses:
+ * Rank | NOC | Gold | Silver | Bronze | Total
  */
-function parsePortalMedalBlock(text, map) {
-  const anchor = "2026 Winter Olympics Medal Table";
-  const start = text.indexOf(anchor);
-  if (start === -1) return [];
+function parseMedalTableFromHtml(html, nocToIso2) {
+  const $ = load(html);
 
-  // Take a chunk after the anchor; large enough to include the medal block.
-  const chunk = text.slice(start, start + 1200);
+  // Wikipedia often uses class="wikitable sortable plainrowheaders"
+  const tables = $("table.wikitable");
+  let medalTable = null;
 
-  // Regex for rows: rank + country name + 4 medal numbers
-  // Country names can include spaces, apostrophes, hyphens; host has trailing *.
-  const rowRe = /\b(\d+)\s+([A-Za-z][A-Za-z'’.\- ]*?)(\*)?\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\b/g;
+  tables.each((_, t) => {
+    const header = $(t).find("tr").first().text().toLowerCase();
+    if (header.includes("gold") && header.includes("silver") && header.includes("bronze") && header.includes("total")) {
+      medalTable = t;
+      return false;
+    }
+  });
+
+  if (!medalTable) return [];
 
   const rows = [];
-  for (const m of chunk.matchAll(rowRe)) {
-    const rank = num(m[1]);
-    const nameRaw = (m[2] || "").trim();
-    const name = nameRaw.replace(/\s+/g, " ");
-    const gold = num(m[4]);
-    const silver = num(m[5]);
-    const bronze = num(m[6]);
-    const total = num(m[7]);
 
-    // Skip totals line if it ever matches
-    if (!name || name.toLowerCase().startsWith("totals")) continue;
+  $(medalTable).find("tr").slice(1).each((_, tr) => {
+    const cells = $(tr).find("th, td");
+    if (cells.length < 6) return;
+
+    const rank = num($(cells[0]).text()) || (rows.length + 1);
+
+    // NOC cell usually contains the country page link + (sometimes) IOC code in small text.
+    const nocCellText = $(cells[1]).text().replace(/\s+/g, " ").trim();
+
+    // Try to extract IOC/NOC code if present like "(ITA)" or trailing "ITA"
+    let noc = null;
+    const m = nocCellText.match(/\(([A-Z]{3})\)\s*$/);
+    if (m) noc = m[1];
+
+    if (!noc) {
+      const last = nocCellText.split(" ").pop();
+      if (/^[A-Z]{3}$/.test(last)) noc = last;
+    }
+
+    // If the page omits codes, fall back to known special cases (and you can extend this)
+    // Example: Italy row often has a host star; name is still "Italy"
+    const name = noc
+      ? nocCellText.replace(new RegExp(`\\s*\$begin:math:text$\$\{noc\}\\$end:math:text$\\s*$`), "").trim()
+      : nocCellText;
+
+    const gold = num($(cells[2]).text());
+    const silver = num($(cells[3]).text());
+    const bronze = num($(cells[4]).text());
+    const total = num($(cells[5]).text());
+
+    // Ignore totals/footer rows
+    if (name.toLowerCase().startsWith("totals")) return;
+    if (!name) return;
 
     rows.push({
       rank,
+      noc: noc || null,
       name,
       gold,
       silver,
       bronze,
       total,
-      flag: flagUrlFromKey(name, map),
+      flag: noc ? flagUrlFromNoc(noc, nocToIso2) : null,
       placeholder: false
     });
-  }
+  });
 
-  // Sort and return top 10
+  // If we found rows, keep them; if medals are still all zeros, caller may choose placeholders.
   rows.sort((a, b) => a.rank - b.rank);
   return rows;
 }
 
 async function main() {
-  const map = safeReadJson(MAP_FILE, {});
+  const nocToIso2 = safeReadJson(MAP_FILE, {});
 
-  const { url, text } = await fetchWikipediaText(SOURCE_PAGE);
-  const parsedRows = parsePortalMedalBlock(text, map);
+  const { sourceUrl, apiUrl, html } = await fetchParsedHtml(PAGE);
+  const parsedRows = parseMedalTableFromHtml(html, nocToIso2);
 
-  const finalRows = parsedRows.length > 0 ? parsedRows.slice(0, 10) : buildPlaceholders(map, PLACEHOLDER_COUNT);
+  // “Live” if any medal exists
+  const hasAnyMedals = parsedRows.some(r => (r.gold + r.silver + r.bronze) > 0);
+
+  const finalRows = hasAnyMedals
+    ? parsedRows.slice(0, 10)
+    : buildPlaceholders(nocToIso2, PLACEHOLDER_COUNT);
 
   const payload = {
     updatedAt: new Date().toISOString(),
-    source: "Wikipedia",
-    sourceUrl: url,
+    source: "Wikipedia (MediaWiki API parse)",
+    sourceUrl,
+    apiUrl,
     games: GAMES_NAME,
-    sourcePage: SOURCE_PAGE,
-    isLiveData: parsedRows.length > 0,
+    page: PAGE,
+    isLiveData: hasAnyMedals,
     rows: finalRows
   };
 
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`Wrote ${OUT_FILE} with ${finalRows.length} rows (${payload.isLiveData ? "live" : "placeholder"})`);
+  console.log(
+    `Wrote ${OUT_FILE} with ${finalRows.length} rows (${payload.isLiveData ? "live" : "placeholder"})`
+  );
 }
 
 main().catch((err) => {
