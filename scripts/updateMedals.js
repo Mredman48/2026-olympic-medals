@@ -84,7 +84,7 @@ function parseMedalTable(html, nocToIso2) {
   const $ = load(html);
 
   // Find the medal table (usually a wikitable sortable with Gold/Silver/Bronze in header)
-  const tables = $("table.wikitable.sortable");
+  const tables = $("table.wikitable");
   let medalTable = null;
 
   tables.each((_, t) => {
