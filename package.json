@@ -1,18 +1,12 @@
 {
-  "name": "olympics-medals-widget",
+  "name": "2026-olympic-medals",
   "private": true,
   "type": "module",
   "scripts": {
-    "update": "node scripts/updateMedals.js"
+    "update": "node scripts/updateMedals.js",
+    "build:mappings": "node scripts/buildNocMappings.js"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.12"
-  }
-}
-
-{
-  "scripts": {
-    "build:mappings": "node scripts/buildNocMappings.js",
-    "update": "node scripts/updateMedals.js"
+    "cheerio": "^1.0.0"
   }
 }
