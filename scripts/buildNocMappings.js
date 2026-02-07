@@ -1,10 +1,4 @@
-      - name: Build NOC mappings (only if missing)
-        run: |
-          if [ ! -f scripts/name_to_noc.json ] || [ ! -f scripts/noc_to_iso2.json ]; then
-            npm run build:mappings
-          else
-            echo "Mappings already exist — skipping"
-          fi
+
 
 // scripts/buildNocMappings.js
 import fs from "node:fs";
