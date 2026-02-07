@@ -11,20 +11,24 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
 
-      - run: npm install
+      - name: Install deps
+        run: npm install
 
-           - name: Update medals
+      - name: Update medals
         run: npm run update
         env:
-          SOURCE_PAGE: Portal:Olympic_Games/Celebration
-          GAMES_NAME: Milano Cortina 2026
+          SOURCE_PAGE: "Portal:Olympic_Games/Celebration"
+          GAMES_NAME: "Milano Cortina 2026"
           PLACEHOLDER_COUNT: "10"
 
       - name: Commit changes
