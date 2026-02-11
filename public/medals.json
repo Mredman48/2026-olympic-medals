@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-11T15:38:21.201Z",
+  "updatedAt": "2026-02-11T19:40:22.175Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -19,6 +19,28 @@
     },
     {
       "rank": 2,
+      "noc": "USA",
+      "name": "United States",
+      "gold": 4,
+      "silver": 5,
+      "bronze": 2,
+      "total": 11,
+      "flag": "https://flagcdn.com/w40/us.png",
+      "placeholder": false
+    },
+    {
+      "rank": 3,
+      "noc": "ITA",
+      "name": "Italy",
+      "gold": 4,
+      "silver": 2,
+      "bronze": 7,
+      "total": 13,
+      "flag": "https://flagcdn.com/w40/it.png",
+      "placeholder": false
+    },
+    {
+      "rank": 4,
       "noc": "SUI",
       "name": "Switzerland",
       "gold": 4,
@@ -29,36 +51,14 @@
       "placeholder": false
     },
     {
-      "rank": 3,
-      "noc": "USA",
-      "name": "United States",
-      "gold": 3,
-      "silver": 5,
-      "bronze": 2,
-      "total": 10,
-      "flag": "https://flagcdn.com/w40/us.png",
-      "placeholder": false
-    },
-    {
-      "rank": 4,
+      "rank": 5,
       "noc": "GER",
       "name": "Germany",
       "gold": 3,
-      "silver": 2,
-      "bronze": 1,
-      "total": 6,
+      "silver": 3,
+      "bronze": 2,
+      "total": 8,
       "flag": "https://flagcdn.com/w40/de.png",
-      "placeholder": false
-    },
-    {
-      "rank": 5,
-      "noc": "SWE",
-      "name": "Sweden",
-      "gold": 3,
-      "silver": 2,
-      "bronze": 1,
-      "total": 6,
-      "flag": "https://flagcdn.com/w40/se.png",
       "placeholder": false
     }
   ]
