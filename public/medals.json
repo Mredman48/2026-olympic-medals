@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-13T19:55:32.462Z",
+  "updatedAt": "2026-02-13T21:54:32.057Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -55,9 +55,9 @@
       "noc": "GER",
       "name": "Germany",
       "gold": 4,
-      "silver": 3,
-      "bronze": 2,
-      "total": 9,
+      "silver": 4,
+      "bronze": 3,
+      "total": 11,
       "flag": "https://flagcdn.com/w40/de.png",
       "placeholder": false
     }
