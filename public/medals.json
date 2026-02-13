@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-13T10:10:36.516Z",
+  "updatedAt": "2026-02-13T11:59:12.770Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -10,10 +10,10 @@
       "rank": 1,
       "noc": "NOR",
       "name": "Norway",
-      "gold": 7,
+      "gold": 8,
       "silver": 2,
-      "bronze": 5,
-      "total": 14,
+      "bronze": 6,
+      "total": 16,
       "flag": "https://flagcdn.com/w40/no.png",
       "placeholder": false
     },
