@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-16T19:47:17.160Z",
+  "updatedAt": "2026-02-16T21:00:54.368Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -12,8 +12,8 @@
       "name": "Norway",
       "gold": 12,
       "silver": 7,
-      "bronze": 8,
-      "total": 27,
+      "bronze": 9,
+      "total": 28,
       "flag": "https://flagcdn.com/w40/no.png",
       "placeholder": false
     },
@@ -23,13 +23,24 @@
       "name": "Italy",
       "gold": 8,
       "silver": 4,
-      "bronze": 10,
-      "total": 22,
+      "bronze": 11,
+      "total": 23,
       "flag": "https://flagcdn.com/w40/it.png",
       "placeholder": false
     },
     {
       "rank": 3,
+      "noc": "USA",
+      "name": "United States",
+      "gold": 6,
+      "silver": 8,
+      "bronze": 5,
+      "total": 19,
+      "flag": "https://flagcdn.com/w40/us.png",
+      "placeholder": false
+    },
+    {
+      "rank": 4,
       "noc": "NED",
       "name": "Netherlands",
       "gold": 6,
@@ -40,25 +51,14 @@
       "placeholder": false
     },
     {
-      "rank": 4,
-      "noc": "USA",
-      "name": "United States",
-      "gold": 5,
-      "silver": 8,
-      "bronze": 4,
-      "total": 17,
-      "flag": "https://flagcdn.com/w40/us.png",
-      "placeholder": false
-    },
-    {
       "rank": 5,
-      "noc": "SWE",
-      "name": "Sweden",
+      "noc": "AUT",
+      "name": "Austria",
       "gold": 5,
-      "silver": 5,
-      "bronze": 1,
-      "total": 11,
-      "flag": "https://flagcdn.com/w40/se.png",
+      "silver": 7,
+      "bronze": 3,
+      "total": 15,
+      "flag": "https://flagcdn.com/w40/at.png",
       "placeholder": false
     }
   ]
