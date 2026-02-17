@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-17T18:38:04.512Z",
+  "updatedAt": "2026-02-17T21:01:32.801Z",
   "source": "Wikipedia",
   "sourceUrl": "https://en.wikipedia.org/wiki/2026_Winter_Olympics_medal_table",
   "games": "Milano Cortina 2026",
@@ -10,10 +10,10 @@
       "rank": 1,
       "noc": "NOR",
       "name": "Norway",
-      "gold": 13,
+      "gold": 14,
       "silver": 8,
       "bronze": 9,
-      "total": 30,
+      "total": 31,
       "flag": "https://flagcdn.com/w40/no.png",
       "placeholder": false
     },
@@ -33,9 +33,9 @@
       "noc": "USA",
       "name": "United States",
       "gold": 6,
-      "silver": 9,
+      "silver": 10,
       "bronze": 5,
-      "total": 20,
+      "total": 21,
       "flag": "https://flagcdn.com/w40/us.png",
       "placeholder": false
     },
@@ -52,13 +52,13 @@
     },
     {
       "rank": 5,
-      "noc": "AUT",
-      "name": "Austria",
+      "noc": "GER",
+      "name": "Germany",
       "gold": 5,
       "silver": 8,
-      "bronze": 3,
-      "total": 16,
-      "flag": "https://flagcdn.com/w40/at.png",
+      "bronze": 7,
+      "total": 20,
+      "flag": "https://flagcdn.com/w40/de.png",
       "placeholder": false
     }
   ]
